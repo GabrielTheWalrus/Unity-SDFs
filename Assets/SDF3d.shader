@@ -185,6 +185,18 @@ Shader "Unlit/SDF3d"
                 return normal;
             }
 
+            // https://iquilezles.org/articles/checkerfiltering
+            float checkersGradBox( float2 p, float2 dpdx, float2 dpdy )
+            {
+                // filter kernel
+                float2 w = abs(dpdx)+abs(dpdy) + 0.001;
+
+                // analytical integral (box filter)
+                float2 i = 2.0*(abs(frac((p-0.5*w)*0.5)-0.5)-abs(frac((p+0.5*w)*0.5)-0.5))/w;
+                // xor pattern
+                return 0.5 - 0.5*i.x*i.y;                  
+            }
+
 
             float3 render( float3 ro, float3 rd, float3 rdx, float3 rdy )
             { 
@@ -204,17 +216,17 @@ Shader "Unlit/SDF3d"
                     // material        
                     col = 0.2 + 0.2*sin( m*2.0 + float3(0.0,1.0,2.0) );
                     float ks = 1.0;
-                    /*
+                    
                     if( m<1.5 )
                     {
                         // project pixel footprint into the plane
-                        vec3 dpdx = ro.y*(rd/rd.y-rdx/rdx.y);
-                        vec3 dpdy = ro.y*(rd/rd.y-rdy/rdy.y);
+                        float3 dpdx = ro.y*(rd/rd.y-rdx/rdx.y);
+                        float3 dpdy = ro.y*(rd/rd.y-rdy/rdy.y);
 
                         float f = checkersGradBox( 3.0*pos.xz, 3.0*dpdx.xz, 3.0*dpdy.xz );
-                        col = 0.15 + f*vec3(0.05);
+                        col = 0.15 + f*float3(0.05, 0.05, 0.05);
                         ks = 0.4;
-                    }
+                    }/*
 
                     // lighting
                     float occ = calcAO( pos, nor );
@@ -274,8 +286,10 @@ Shader "Unlit/SDF3d"
                 float time =  32.0 + _Time.y * 5.0;
 
                 // camera
-                float3 ta = float3( 0.25, -0.75, -0.75 );
-                float3 ro = ta + float3( 4.5*cos(0.1*time), 2.2, 4.5*sin(0.1*time) );
+                float3 ta = float3( 0.0, 0.0, 0.0 ); // point
+                float3 ro = ta + float3( 0.0, 3, 5 ); // eye
+
+                // vec3 ro = ta + vec3( 4.5*cos(0.1*time + 7.0*mo.x), 2.2, 4.5*sin(0.1*time + 7.0*mo.x) );
 
                 // camera-to-world transformation
                 float3x3 ca = setCamera( ro, ta, 0.0 );
@@ -287,7 +301,7 @@ Shader "Unlit/SDF3d"
                 float2 p = (2.0 * fragCood-resolution.xy)/resolution.y;
 
                     // focal length
-                float fl = 2.5;
+                float fl = 1.5;
                 
                 // ray direction
                 float3 rd = mul(ca, normalize( float3(p,fl) ));
