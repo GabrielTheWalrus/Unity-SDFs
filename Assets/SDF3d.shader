@@ -6,7 +6,7 @@ Shader "Unlit/SDF3d"
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
+        Tags { "RenderType"="Transparent" }
 
         Pass
         {
@@ -39,15 +39,32 @@ Shader "Unlit/SDF3d"
                 return o;
             }
 
+            float sdSphere( float3 p, float s )
+            {
+                return length(p)-s;
+            }
+
+            float sdBox( float3 p, float3 b )
+            {
+                float3 d = abs(p) - b;
+                return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
+            }
+
+            float2 opU( float2 d1, float2 d2 )
+            {
+                return (d1.x<d2.x) ? d1 : d2;
+            }
+
+
             float2 map( float3 pos )
             {
                 float2 res = float2( pos.y, 0.0 );
 
-                // bounding box
-                // if( sdBox( pos-vec3(-2.0,0.3,0.25),vec3(0.3,0.3,1.0) )<res.x )
+                //bounding box
+                // if( sdBox( pos-float3(-2.0,0.3,0.25),float3(0.3,0.3,1.0) )<res.x )
                 // {
-                // res = opU( res, vec2( sdSphere(    pos-vec3(-2.0,0.25, 0.0), 0.25 ), 26.9 ) );
-                // res = opU( res, vec2( sdRhombus(  (pos-vec3(-2.0,0.25, 1.0)).xzy, 0.15, 0.25, 0.04, 0.08 ),17.0 ) );
+                // res = opU( res, float2( sdSphere(    pos-float3(-2.0,1.0, 0.0), 0.25 ), 26.9 ) );
+                // //res = opU( res, vec2( sdRhombus(  (pos-float3(-2.0,0.25, 1.0)).xzy, 0.15, 0.25, 0.04, 0.08 ),17.0 ) );
                 // }
 
                 // bounding box
@@ -95,16 +112,6 @@ Shader "Unlit/SDF3d"
 
 
             // funções do shader
-            float3x3 setCamera( float3 ro, float3 ta )
-            {
-                float3 cw = normalize(ta-ro);
-                float3 cp = float3(0.0, 1.0, 0.0);
-                float3 cu = normalize( cross(cw,cp) );
-                float3 cv =          ( cross(cu,cw) );
-
-                // unity trabalha com matriz em formato diferente
-                return transpose(float3x3( cu, cv, cw ));
-            }
 
             // https://iquilezles.org/articles/boxfunctions
             float2 iBox( float3 ro, float3 rd, float3 rad ) 
@@ -281,23 +288,40 @@ Shader "Unlit/SDF3d"
                 return float3( clamp(col,0.0,1.0) );
             }
 
+            float3x3 setCamera( float3 ro, float3 ta )
+            {
+                float3 cw = normalize(ta-ro);
+                float3 cp = float3(0.0, 1.0, 0.0);
+                float3 cu = normalize( cross(cw,cp) );
+                float3 cv =          ( cross(cu,cw) );
+
+                // unity trabalha com matriz em formato diferente
+                return transpose(float3x3( cu, cv, cw ));
+            }
+
             fixed4 frag (Interpolators i) : SV_Target
             {
 
                 float time =  32.0 + _Time.y * 5.0;
 
                 // camera
-                float3 ta = float3( 0.25, -0.75, -0.75 ); // point
-                // float3 ro = ta + float3( 0.0, 3, 5 ); // eye
+                //float3 ta = float3( 0, 0, 0 );
+                
+                // float3 ro = float3(1*cos(0.1*time + 7.0*1),3,5*sin(0.1*time + 7.0*1));
 
-                float3 ro = ta + float3( 4.5*cos(0.1*time + 7.0*1), 2.2, 4.5*sin(0.1*time + 7.0*1) );
+                //float3 ro = ta + float3( 4.5*cos(0.1*time + 7.0*1), 2.2, 4.5*sin(0.1*time + 7.0*1) );
+
+                //float3 ro = ta + float3( 4.5*cos(0.1 + 7.0), 2.2, 4.5*sin(0.1 + 7.0) );
+              
+                float3 ta = float3(0, 0, 0);
+                float3 ro = float3(0, 10, 5);
 
                 // camera-to-world transformation
                 float3x3 ca = setCamera( ro, ta );
                 float3 total = float3(0.0, 0.0, 0.0);
 
-                float2 resolution = float2(1000.0, 1000.0);
-                float2 fragCood = i.uv * resolution.xy;
+                // float2 resolution = float2(1.0, 1.0);
+                // float2 fragCood = i.uv * resolution.xy;
 
                 float2 p = i.uv * 2.0 - 1;
                 
