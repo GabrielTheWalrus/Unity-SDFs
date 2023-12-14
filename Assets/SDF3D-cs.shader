@@ -1,4 +1,4 @@
-Shader "Unlit/TestingShader"
+Shader "Unlit/SDF3D-cs"
 {
 
     Properties
@@ -11,14 +11,12 @@ Shader "Unlit/TestingShader"
     SubShader
     {
         //Tags{ "RenderType"="Opaque" "Queue"="Opaque" }
-        Tags{ "Queue"="Transparent" "RenderType"="Transparent"}
-        Blend SrcAlpha OneMinusSrcAlpha
-        ZWrite off
-        //Blend 1 Off
-        //Blend One One
+
         Pass
         {
             CGPROGRAM
+// Upgrade NOTE: excluded shader from DX11, OpenGL ES 2.0 because it uses unsized arrays
+#pragma exclude_renderers d3d11 gles
             #pragma vertex vert
             #pragma fragment frag
             // make fog work
@@ -32,13 +30,11 @@ Shader "Unlit/TestingShader"
             #define MAX_DIST 100.
             #define SURF_DIST .01
 
-            // uniform float[] _array;
-            float _objects [20];
-            // float _operations [10];
-            uniform float3 _Position [20];
-            uniform float3 _Rotation [20];
-            uniform float3 _Scale [20];
-            //uniform float3 _Color [20];
+            uniform float _ObjectTypes; [20];
+            uniform float4 _Positions [20];
+            uniform float3 _Translations [20];
+            uniform float3 _Scales [20];
+            uniform float3 _Colors [20];
             uniform float3 _Operations [20];
 
             struct MeshData
@@ -76,20 +72,20 @@ Shader "Unlit/TestingShader"
 
                 // float t = iTime;
 
-                float4 sphere = _BallPosition; //float4(0., 1., 5., 1.); 
-                float4 sphere2 = float4(.5, 3., 2., 2.);
+                float4 sphere = _Positions; //float4(0., 1., 5., 1.); 
+                float4 sphere2 = float4(.5, 3., 5., 2.);
                 float4 wall = float4(0.0, .0, 2, 1.0);
                 
                 float sphereDist = sdSphere((p-sphere.xyz), sphere.w);
                 float sphereDist2 = sdSphere((p-sphere2.xyz), sphere2.w);
                 float groundDist = sdPlane(p);
                 
-                return float2(sphereDist, 1.);
+                //return float2(sphereDist, 1.);
 
-                // if(sphereDist < groundDist)
-                //     return float2(sphereDist, 1.);
+                if(sphereDist < groundDist)
+                    return float2(sphereDist, 1.);
                 
-                // else return float2(groundDist, 0.);
+                else return float2(groundDist, 0.);
             }
 
             float rayMarch(float3 ro, float3 rd){
@@ -121,14 +117,12 @@ Shader "Unlit/TestingShader"
             {
                 // Normalized pixel coordinates (from 0 to 1)
                 // vec2 uv = fragCoord/iResolution.xy; // 640 x 360
-
                 float2 uv = interpolator.uv;
                 uv -= .5;
                 uv.x *= 640/360 * 1.75; // numero cabalistico
 
-                // float3 worldPos = UnityWorldSpaceViewDir(float3(.0, .0, .0));
 
-                float3 ro = _WorldSpaceCameraPos; //float3(.0, 1.0, -2.);
+                float3 ro = float3(.0, 1.0, -2.);
                 float3 lookat = float3(.0, 1., 5.);
 
                 float3x3 cameraMatrix = setCamera(ro, lookat, float3(0., 1., 0.));
@@ -136,33 +130,16 @@ Shader "Unlit/TestingShader"
 
                 float3 c = ro + cameraMatrix[0]*zoom;
                 float3 i = c + uv.x * cameraMatrix[1] + uv.y * cameraMatrix[2];
-                float3 rd = i - ro;//i - ro;
+                float3 rd = i - ro;
 
                 float res = rayMarch(ro, rd);
                 res /= 20.;
 
-                //res = smoothstep(.001 , 1. , res);
-
-                res = step(res, 0.5);
-                //float alpha = step(0.5, res); // Se res < 0.5, alpha é 0; se res >= 0.5, alpha
+                //float alpha = step(res, 0.5); // Se res < 0.5, alpha é 0; se res >= 0.5, alpha
+                float alpha = res;
+                fixed4 col = float4(alpha, alpha, alpha, 0.0); // Adjust the alpha value as needed
                 
-                float3 col = float3(res, res, res);
-                // if(res = 1.0)
-                //     return float4(col, 0.0);
-
-                //return float4(_teste, 1.0);
-
-                if (res == 0.0) {
-                        // If color is zero, use blending
-                    fixed4 col = float4(res, res, res, 0.0); // Adjust the alpha value as needed
-                    return col*_Color;
-                } else {
-                    // If color is not zero, don't blend (use alpha = 1.0)
-                    fixed4 col = float4(res, res, res, 1.0);
-                    return col*_Color;
-                }
-
-                
+                return col;//*_Color;
             }
             ENDCG
         }
