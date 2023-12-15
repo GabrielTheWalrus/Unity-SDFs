@@ -21,7 +21,8 @@ Shader "Unlit/DefinitiveSDF"
             uniform int _QtdObj;
             uniform float _ObjectTypes [20];
             uniform float4 _Positions [20];
-            uniform float4 _Translations [20];
+            // uniform float4 _Translations [20];
+            uniform float4 _Rotations [20];
             uniform float4 _Scales [20];
             uniform float4 _Colors [20];
             uniform float4 _Operations [20];
@@ -58,53 +59,142 @@ Shader "Unlit/DefinitiveSDF"
                 return (float3x3(f,r,u));
             }
 
+            float3 Translate(float3 pos, float3 translation)
+            {
+                return pos + translation;
+            }
+
+            float3 Rotate(float3 pos, float4 rotation)
+            {
+                return mul(rotation, pos);
+            }
+
+            float3 RotateVector(float3 vec, float3 axis, float angle)
+            {
+                // Normaliza o eixo de rotação
+                axis = normalize(axis);
+
+                // Calcula os componentes da fórmula de rotação de Rodrigues
+                float3 crossProduct = cross(vec, axis);
+                float dotProduct = dot(vec, axis);
+
+                // Aplica a fórmula de rotação de Rodrigues
+                float3 rotatedVector = vec * cos(angle) + crossProduct * sin(angle) + axis * dotProduct * (1 - cos(angle));
+
+                return rotatedVector;
+            }
+
+            float3 Scale(float3 pos, float3 scale)
+            {
+                return pos * scale;
+            }
+
+            float3 ApplyTransformations(float3 pos, float4 rotation, float4 scale)
+            {
+                pos = Scale(pos, scale.xyz);
+                pos = RotateVector(pos, rotation.xyz, rotation.w);
+                 // pos = Translate(pos, translation.xyz);
+
+
+                return pos;
+            }
+
             float sdPlane( float3 p )
             {
                 return p.y;
             }
 
-            float sdSphere( float3 p, float s )
+            float sdSphere(float3 p, float radius, float4 rotation, float4 scale)
             {
-                return length(p)-s;
+                // Aplica transformações à posição
+                p = ApplyTransformations(p, rotation, scale);
+
+                // Restante da lógica da esfera
+                return length(p) - radius;
             }
 
-            float sdCapsule(float3 p, float3 a, float3 b, float r) {
-                float3 ab = b-a;
-                float3 ap = p-a;
-                
+            float dBox(float3 p, float4 rotation, float4 scale)
+            {
+                // Aplica transformações à posição
+                p = ApplyTransformations(p, rotation, scale);
+
+                // Restante da lógica da caixa
+                return length(max(abs(p) - scale.xyz, 0.));
+            }
+
+            float sdCapsule(float3 p, float3 a, float3 b, float r, float4 rotation, float4 scale)
+            {
+                // Aplica transformações à posição
+                p = RotateVector(p.xyz, rotation.xyz, rotation.w);
+                p = p * scale.xyz;
+
+                // Restante da lógica da cápsula
+                float3 ab = b - a;
+                float3 ap = p - a;
+
                 float t = dot(ab, ap) / dot(ab, ab);
                 t = clamp(t, 0., 1.);
-                
-                float3 c = a + t*ab;
-                
-                return length(p-c)-r;
+
+                float3 c = a + t * ab;
+
+                return length(p - c) - r;
             }
 
-            float sdTorus(float3 p, float2 r) {
+            float sdCapsuleV2(float3 p, float3 capsulePosition, float r, float4 rotation, float4 scale)
+            {
+                // Aplica transformações à posição
+                p = RotateVector(p.xyz, rotation.xyz, rotation.w);
+                p = p * scale.xyz;
 
-                float x = length(p.xz)-r.x;
-                return length(float2(x, p.y))-r.y;
+                // Restante da lógica da cápsula
+                float3 ap = p - capsulePosition;
+
+                // Desfaz o escalonamento na direção da cápsula
+                ap /= scale.xyz;
+
+                float t = dot(ap, float3(0, 1, 0)) / dot(float3(0, 1, 0), float3(0, 1, 0));
+                t = clamp(t, 0., 1.);
+
+                float3 c = capsulePosition + t * float3(0, 1, 0);
+
+                // Aplica o escalonamento na direção da cápsula
+                c *= scale.xyz;
+
+                return length(p - c) - r;
             }
 
-            float dBox(float3 p, float3 s) {
-                return length(max(abs(p)-s, 0.));
+            float sdTorus(float3 p, float2 r, float4 rotation, float4 scale)
+            {
+                // Aplica transformações à posição
+                p = ApplyTransformations(p, rotation, scale);
+
+                // Restante da lógica do torus
+                float x = length(p.xz) - r.x;
+                return length(float2(x, p.y)) - r.y;
             }
 
-            float sdCylinder(float3 p, float3 a, float3 b, float r) {
-                float3 ab = b-a;
-                float3 ap = p-a;
-                
+            float sdCylinderV2(float3 p, float3 center, float r, float4 rotation, float4 scale)
+            {
+                // Aplica transformações à posição
+                p = p * scale.xyz;
+                p = RotateVector(p.xyz, rotation.xyz, rotation.w);
+
+                // Restante da lógica do cilindro
+                float3 ab = float3(0, 2.0, 0);
+                float3 ap = RotateVector(p - center, -rotation.xyz, -rotation.w) / float3(scale.x, scale.y, scale.z); // Desfaz o escalonamento e a rotação
+
                 float t = dot(ab, ap) / dot(ab, ab);
-                //t = clamp(t, 0., 1.);
-                
-                float3 c = a + t*ab;
-                
-                float x = length(p-c)-r;
-                float y = (abs(t-.5)-.5)*length(ab);
-                float e = length(max(float2(x, y), 0.));
-                float i = min(max(x, y), 0.);
-                
-                return e+i;
+
+                float3 c = center + t * ab;
+
+                // Aplica o escalonamento e a rotação novamente
+                c = RotateVector(c, rotation.xyz, rotation.w);
+                c *= float3(scale.x, scale.y, scale.z);
+
+                float x = length(p - c) - r;
+                float y = abs(t - 0.5) * length(ab) - 0.5 * length(ab);
+
+                return length(max(float2(x, y), 0.)) + min(max(x, y), 0.);
             }
 
             float2 getDist(float3 p){
@@ -129,40 +219,34 @@ Shader "Unlit/DefinitiveSDF"
 
                 for(int i = 0; i < _QtdObj; i++){
 
-                    if(_ObjectTypes[i] == 0){ // Sphere
-
-                        sphere[i] = float4(_Positions[i]);
-                        sphereDist[i] = sdSphere(p-sphere[i].xyz, sphere[i].w);
-
+                    if(_ObjectTypes[i] == 0) // Sphere
+                    {
+                        sphere[i] = _Positions[i];
+                        sphereDist[i] = sdSphere(p - sphere[i].xyz, sphere[i].w, _Rotations[i], _Scales[i]);
                         dist = min(dist, sphereDist[i]);
                     }
-                    else if(_ObjectTypes[i] == 1){ // Box
-
-                        box[i] = float4(_Positions[i]);
-                        boxDist[i] = dBox(p - box[i].xyz, float3(1,1, 1)*box[i].w);
-
+                    else if(_ObjectTypes[i] == 1) // Box
+                    {
+                        box[i] = _Positions[i];
+                        boxDist[i] = dBox(p - box[i].xyz, _Rotations[i], _Scales[i]);
                         dist = min(dist, boxDist[i]);
                     } 
-                    else if(_ObjectTypes[i] == 2){  // Capsule
-
-                        capsule[i] = float4(_Positions[i]);
-                        capsuleDist[i] = sdCapsule(p, capsule[i].xyz, float3(capsule[i].x, capsule[i].y + 2.0, capsule[i].z), capsule[i].w);
-
+                    else if(_ObjectTypes[i] == 2)  // Capsule
+                    {
+                        capsule[i] = _Positions[i];
+                        capsuleDist[i] = sdCapsuleV2(p, capsule[i].xyz, capsule[i].w, _Rotations[i], _Scales[i]);
                         dist = min(dist, capsuleDist[i]);
                     } 
-                    else if(_ObjectTypes[i] == 3){ // Torus
-
-                        torus[i] = float4(_Positions[i]);
-                        torusDist[i] = sdTorus(p - torus[i].xyz, float2(1.5, .4)*torus[i].w);
-
+                    else if(_ObjectTypes[i] == 3) // Torus
+                    {
+                        torus[i] = _Positions[i];
+                        torusDist[i] = sdTorus(p - torus[i].xyz, float2(1.5, .4) * torus[i].w, _Rotations[i], _Scales[i]);
                         dist = min(dist, torusDist[i]);
                     }
-
-                    else if(_ObjectTypes[i] == 4){ // Cylinder
-
-                        cylinder[i] = float4(_Positions[i]);
-                        cylinderDist[i] = sdCylinder(p, cylinder[i].xyz, float3(cylinder[i].x + 3.0, cylinder[i].y, cylinder[i].z), cylinder[i].w);
-
+                    else if(_ObjectTypes[i] == 4) // Cylinder
+                    {
+                        cylinder[i] = _Positions[i];
+                        cylinderDist[i] = sdCylinderV2(p, cylinder[i].xyz, cylinder[i].w, _Rotations[i], _Scales[i]);
                         dist = min(dist, cylinderDist[i]);
                     }
                 }
@@ -214,7 +298,7 @@ Shader "Unlit/DefinitiveSDF"
                 return col;
                 
                 //// DEBUG ////
-                //return _Positions[1];
+                // return _Positions[0];
                 //return float4(_QtdObj-1.5, 0, 0, 1.0);
                 //return float4(uv, 0, 1.0);
             }
