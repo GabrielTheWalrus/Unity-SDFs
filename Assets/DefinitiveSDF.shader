@@ -316,7 +316,7 @@ Shader "Unlit/DefinitiveSDF"
                 }
 
                 if(object_id == -1)
-                    return float4(dO, float3(1,1,1));
+                    return float4(dO, float3(0,1,1));
                 else
                     return float4(dO, _Colors[object_id].xyz);
             }
@@ -364,20 +364,19 @@ Shader "Unlit/DefinitiveSDF"
                 uv.x *= 640/360 * 1.75;
                 float t = _Time * 25;
 
-                float pi = 3.1415926;
-                float3 ro = float3(0, 5.0, -5);
+                float3 ro = float3(0, 4.0, -2);
                 
-                float3 lookat = float3(.0, 1., 5.);
+                float3 lookat = float3(.0, 1., 4.);
 
                 float3x3 cameraMatrix = setCamera(ro, lookat, float3(0., 1., 0.));
 
                 float zoom = 1.;
-
+ 
                 float3 c = ro + cameraMatrix[0]*zoom;
                 float3 i = c + uv.x * cameraMatrix[1] + uv.y * cameraMatrix[2];
                 float3 rd = i - ro;
 
-                float3 lightSourcePos = float3(6, 6., 3);
+                float3 lightSourcePos = float3(sin(t)*2, 6., 2*cos(t));
                 
                 float4 res = rayMarch(ro, rd);
                 
