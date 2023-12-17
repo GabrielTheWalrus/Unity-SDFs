@@ -336,7 +336,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ac71df8035a7de146bcf95bda5d557a4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Qtd_Objects: 1
+  Qtd_Objects: 5
   Object_Types:
   - 0
   - 2
@@ -344,11 +344,11 @@ MonoBehaviour:
   - 1
   - 4
   Positions:
-  - {x: -0.5, y: 1, z: 5, w: 0.5}
-  - {x: 0.5, y: 1, z: 5, w: 0.5}
-  - {x: -1, y: 1, z: 3, w: 0.5}
-  - {x: 2, y: 3, z: 4, w: 1}
-  - {x: -2, y: 3, z: 2, w: 1}
+  - {x: 0, y: 1, z: 5, w: 0.5}
+  - {x: 0, y: 1, z: 5, w: 0.5}
+  - {x: 0, y: 1, z: 5, w: 0.5}
+  - {x: 0, y: 1, z: 5, w: 1}
+  - {x: 0, y: 1, z: 5, w: 1}
   Rotations:
   - {x: 0, y: 1, z: 0, w: 0}
   - {x: 0, y: 1, z: 0, w: 0}
