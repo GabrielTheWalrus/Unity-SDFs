@@ -262,29 +262,31 @@ Shader "Unlit/DefinitiveSDF"
                 for(int j = 0; j < 20; j++)
                     index_to_ignore[j] = 0;
 
-                for(int x = 0; x < 5; x++){
+                for(int x = 0; x < _QtdObj; x++){
 
                     if(x < _QtdOperations){
-
                         index_obj_1 = _Operations[x].x;
                         index_obj_2 = _Operations[x].y;
                         operation = _Operations[x].z;
 
-                        result = resolveOperator(distance_res[index_obj_1], distance_res[index_obj_2], operation);
-                        
-                        dist = result.x;
-                        _color = result.y;
+                        float2 res2 = resolveOperator(distance_res[index_obj_1], distance_res[index_obj_2], operation);
+
+                        if(res2.x < result.x){
+                            result = res2;
+                        }
 
                         index_to_ignore[index_obj_1] = 1;
                         index_to_ignore[index_obj_2] = 1;
                     }
                     else{
-                        if(index_to_ignore[x] == 0){
-                            result = resolveOperator(result, distance_res[x], 0);
-                            dist = result.x;
-                            _color = result.y;
-                        }
+                        if(index_to_ignore[x] == 0)
+                            if(distance_res[x].x < result.x)
+                                result = distance_res[x];
                     }
+
+                    dist = result.x;
+                    _color = result.y;
+                    
                 }
 
                 if(dist < groundDist)
@@ -348,6 +350,12 @@ Shader "Unlit/DefinitiveSDF"
 
             }
 
+            float2x2 Rot(float a) {
+                float s = sin(a);
+                float c = cos(a);
+                return float2x2(c, -s, s, c);
+            }
+
             fixed4 frag (Interpolators interpolator) : SV_Target
             {
                 float2 uv = interpolator.uv;
@@ -356,17 +364,20 @@ Shader "Unlit/DefinitiveSDF"
                 uv.x *= 640/360 * 1.75;
                 float t = _Time * 25;
 
-                float3 ro = float3(.0, 4.0, -2.);
+                float pi = 3.1415926;
+                float3 ro = float3(0, 5.0, -5);
+                
                 float3 lookat = float3(.0, 1., 5.);
 
                 float3x3 cameraMatrix = setCamera(ro, lookat, float3(0., 1., 0.));
+
                 float zoom = 1.;
 
                 float3 c = ro + cameraMatrix[0]*zoom;
                 float3 i = c + uv.x * cameraMatrix[1] + uv.y * cameraMatrix[2];
                 float3 rd = i - ro;
 
-                float3 lightSourcePos = float3(sin(t/2)*5, 6., cos(t/2)*5);
+                float3 lightSourcePos = float3(6, 6., 3);
                 
                 float4 res = rayMarch(ro, rd);
                 
@@ -374,7 +385,7 @@ Shader "Unlit/DefinitiveSDF"
 
                 float4 res_light = getLight(p, lightSourcePos);
                 float4 res_color = float4(res.yzw, 1);
-
+                
                 return res_light * res_color;
             }
             ENDCG
