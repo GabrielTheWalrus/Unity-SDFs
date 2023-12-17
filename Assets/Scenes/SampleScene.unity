@@ -339,9 +339,9 @@ MonoBehaviour:
   Qtd_Objects: 5
   Object_Types:
   - 0
+  - 1
   - 2
   - 3
-  - 1
   - 4
   Positions:
   - {x: 0, y: 1, z: 5, w: 0.5}
@@ -363,7 +363,11 @@ MonoBehaviour:
   - {x: 1, y: 1, z: 1, w: 1}
   Colors:
   - {x: 0, y: 0, z: 0, w: 0}
-  - {x: 0, y: 0, z: 0, w: 0}
+  - {x: 0.96, y: 1.43, z: 0.71, w: 0}
+  - {x: 0.96, y: 1.43, z: 0.71, w: 0}
+  - {x: 0.96, y: 1.43, z: 0.71, w: 0}
+  - {x: 0.96, y: 1.43, z: 0.71, w: 0}
+  Qtd_Operations: 1
   Operations:
   - {x: 0, y: 0, z: 0, w: 0}
   - {x: 0, y: 0, z: 0, w: 0}

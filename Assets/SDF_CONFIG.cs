@@ -12,6 +12,8 @@ public class SDF_CONFIG : MonoBehaviour
     public Vector4[] Rotations; 
     public Vector4[] Scales;
     public Vector4[] Colors;
+    
+    public int Qtd_Operations;
     public Vector4[] Operations;
     public Material material;
 
@@ -28,6 +30,7 @@ public class SDF_CONFIG : MonoBehaviour
         material.SetVectorArray("_Rotations", Rotations);
         material.SetVectorArray("_Scales", Scales);
         material.SetVectorArray("_Colors", Colors);
+        material.SetFloat("_QtdOperations", Qtd_Operations);
         material.SetVectorArray("_Operations", Operations);
     }
 }

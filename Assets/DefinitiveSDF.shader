@@ -19,9 +19,9 @@ Shader "Unlit/DefinitiveSDF"
             #define SURF_DIST .01
 
             uniform int _QtdObj;
+            uniform int _QtdOperations;
             uniform float _ObjectTypes [20];
             uniform float4 _Positions [20];
-            // uniform float4 _Translations [20];
             uniform float4 _Rotations [20];
             uniform float4 _Scales [20];
             uniform float4 _Colors [20];
@@ -64,21 +64,12 @@ Shader "Unlit/DefinitiveSDF"
                 return pos + translation;
             }
 
-            float3 Rotate(float3 pos, float4 rotation)
-            {
-                return mul(rotation, pos);
-            }
-
             float3 RotateVector(float3 vec, float3 axis, float angle)
             {
-                // Normaliza o eixo de rotação
                 axis = normalize(axis);
 
-                // Calcula os componentes da fórmula de rotação de Rodrigues
                 float3 crossProduct = cross(vec, axis);
                 float dotProduct = dot(vec, axis);
-
-                // Aplica a fórmula de rotação de Rodrigues
                 float3 rotatedVector = vec * cos(angle) + crossProduct * sin(angle) + axis * dotProduct * (1 - cos(angle));
 
                 return rotatedVector;
@@ -87,16 +78,6 @@ Shader "Unlit/DefinitiveSDF"
             float3 Scale(float3 pos, float3 scale)
             {
                 return pos * scale;
-            }
-
-            float3 ApplyTransformations(float3 pos, float4 rotation, float4 scale)
-            {
-                pos = Scale(pos, scale.xyz);
-                pos = RotateVector(pos, rotation.xyz, rotation.w);
-                 // pos = Translate(pos, translation.xyz);
-
-
-                return pos;
             }
 
             float sdPlane( float3 p )
@@ -170,68 +151,144 @@ Shader "Unlit/DefinitiveSDF"
                 return e+i;
             }
 
+            float2 resolveOperator(float2 dist, float2 dist2, float i){
+
+                float2 res;
+                if(i == 0){
+                    if(dist.x < dist2.x){
+                        res.x = dist.x;
+                        res.y = dist.y;
+                    }
+                    else{
+                        res.x = dist2.x;
+                        res.y = dist2.y;
+                    }
+                }
+                else if(i == 1){
+                    if(dist.x > dist2.x){
+                        res.x = dist.x;
+                        res.y = dist.y;
+                    }
+                    else{
+                        res.x = dist2.x;
+                        res.y = dist2.y;
+                    }
+                }
+                else if(i == 2){
+
+                    if(-dist.x > dist2.x){
+                        res.x = -dist.x;
+                        res.y = dist.y;
+                    }
+                    else{
+                        res.x = dist2.x;
+                        res.y = dist2.y;
+                    }
+                }
+
+                return res;
+            }
+
             float2 getDist(float3 p){
 
-                // float t = iTime;
                 float4 sphere[20];
                 float sphereDist[20];
 
                 float4 box[20];
-                float4 boxDist[20];
+                float boxDist[20];
 
                 float4 capsule[20];
-                float4 capsuleDist[20];
+                float capsuleDist[20];
 
                 float4 torus[20];
-                float4 torusDist[20];
+                float torusDist[20];
 
                 float4 cylinder[20];
-                float4 cylinderDist[20];
+                float cylinderDist[20];
 
                 float dist = MAX_DIST;
                 float object_id = -1;
 
                 float groundDist = sdPlane(p);
 
+                float2 distance_res[20];
+
+                for(int k = 0; k < 20; k++){
+                    distance_res[k].x = MAX_DIST;
+                    distance_res[k].y = -1;
+                }
+                
                 for(int i = 0; i < _QtdObj; i++){
-                    
+
                     if(_ObjectTypes[i] == 0) // Sphere
                     {
-                        // sphere[i] = _Positions[i];
-                        // sphereDist[i] = sdSphere(p - sphere[i].xyz, sphere[i].w, _Rotations[i], _Scales[i]);
-                        // dist = min(dist, sphereDist[i]);
-                        // current_color = _Colors[i]
+                        sphere[i] = _Positions[i];
+                        sphereDist[i] = sdSphere(p - sphere[i].xyz, sphere[i].w, _Rotations[i], _Scales[i]);
+                        distance_res[i] = float2(min(distance_res[i].x, sphereDist[i]), i);                 
                     }
-                    if(_ObjectTypes[i] == 1) // Box
+                    else if(_ObjectTypes[i] == 1) // Box
                     {
                         box[i] = _Positions[i];
                         boxDist[i] = dBox(p - box[i].xyz, _Rotations[i], _Scales[i]);
-                        dist = min(dist, boxDist[i]);
+                        distance_res[i] = float2(min(distance_res[i].x, boxDist[i]), i);
                     } 
-                    if(_ObjectTypes[i] == 2)  // Capsule
+                    else if(_ObjectTypes[i] == 2)  // Capsule
                     {
-                        // capsule[i] = _Positions[i];
-                        // capsuleDist[i] = sdCapsule(p, capsule[i].xyz, capsule[i].w, _Rotations[i], _Scales[i]);
-                        // dist = min(dist, capsuleDist[i]);
+                        capsule[i] = _Positions[i];
+                        capsuleDist[i] = sdCapsule(p, capsule[i].xyz, capsule[i].w, _Rotations[i], _Scales[i]);
+                        distance_res[i] = float2(min(distance_res[i].x, capsuleDist[i]), i);
                     } 
-                    if(_ObjectTypes[i] == 3) // Torus
+                    else if(_ObjectTypes[i] == 3) // Torus
                     {
                         torus[i] = _Positions[i];
                         torusDist[i] = sdTorus(p - torus[i].xyz, float2(1.5, .4) * torus[i].w, _Rotations[i], _Scales[i]);
-                        dist = min(dist, torusDist[i]);
+                        distance_res[i] = float2(min(distance_res[i].x, torusDist[i]), i);
                     }
-                    if(_ObjectTypes[i] == 4) // Cylinder
+                    else if(_ObjectTypes[i] == 4) // Cylinder
                     {
-                        // cylinder[i] = _Positions[i];
-                        // cylinderDist[i] = sdCylinder(p, cylinder[i].xyz, cylinder[i].w, _Rotations[i], _Scales[i]);
-                        // dist = min(dist, cylinderDist[i]);
+                        cylinder[i] = _Positions[i];
+                        cylinderDist[i] = sdCylinder(p, cylinder[i].xyz, cylinder[i].w, _Rotations[i], _Scales[i]);
+                        distance_res[i] = float2(min(distance_res[i].x, cylinderDist[i]), i);
                     }
-                    // else
-                    //     return float2(groundDist, -1);
+                }
+
+                int index_obj_1;
+                int index_obj_2;
+                float operation;
+                float _color = -1;
+                float2 result = float2(MAX_DIST, -1);  
+                int index_to_ignore[20];
+
+                for(int j = 0; j < 20; j++)
+                    index_to_ignore[j] = 0;
+
+                for(int x = 0; x < 5; x++){
+
+                    if(x < _QtdOperations){
+
+                        index_obj_1 = _Operations[x].x;
+                        index_obj_2 = _Operations[x].y;
+                        operation = _Operations[x].z;
+
+                        result = resolveOperator(distance_res[index_obj_1], distance_res[index_obj_2], operation);
+                        
+                        dist = result.x;
+                        _color = result.y;
+
+                        index_to_ignore[index_obj_1] = 1;
+                        index_to_ignore[index_obj_2] = 1;
+                    }
+                    else{
+                        if(index_to_ignore[x] == 0){
+                            result = resolveOperator(result, distance_res[x], 0);
+                            dist = result.x;
+                            _color = result.y;
+                        }
+                    }
                 }
 
                 if(dist < groundDist)
-                    return float2(dist, object_id);
+                    return float2(dist, _color);
                 else
                     return float2(groundDist, -1);
 
@@ -242,60 +299,64 @@ Shader "Unlit/DefinitiveSDF"
                 float dO = .0;
                 float object_id;
                 float2 distance;
-                
+
                 for(int i = 0; i < MAX_STEPS; i++){
-                    
+
                     float3 p = ro + rd * dO; // distancia da superficie
                     distance = getDist(p);
                     float dS = distance.x;
                     object_id = distance.y;
 
                     dO = dO + dS;
-                    
+
                     if(dO > MAX_DIST || dS < SURF_DIST) break;
 
                 }
-                
-                return float4(dO, _Colors[object_id].xyz);
+
+                if(object_id == -1)
+                    return float4(dO, float3(1,1,1));
+                else
+                    return float4(dO, _Colors[object_id].xyz);
             }
 
             float3 getNormal(float3 p){
  
                 float d = getDist(p).x;
-                float2 e = float2(.0001, 0);
-                
+                float2 e = float2(.00001, 0);
+
                 float3 n = d - float3(
                     getDist(p-e.xyy).x,
                     getDist(p-e.yxy).x,
                     getDist(p-e.yyx).x);
-                    
+
                 return normalize(n);
             }
 
             float getLight(float3 p, float3 lightSourcePos){
-    
+
                 float3 l = normalize(lightSourcePos-p); // light direction from point p
                 float3 n = getNormal(p);
-                
+
                 float dif = clamp(dot(n,l), 0., 1.);
-                
+
                 float d = rayMarch(p+n*SURF_DIST*2.0, l).x;
-                
+
                 if(d < length(lightSourcePos-p))
                     return dif*0.2;
 
                 return dif;
-            
+
             }
 
             fixed4 frag (Interpolators interpolator) : SV_Target
             {
                 float2 uv = interpolator.uv;
+                
                 uv -= .5;
-                uv.x *= 640/360 * 1.75; // numero cabalistico
+                uv.x *= 640/360 * 1.75;
                 float t = _Time * 25;
 
-                float3 ro = float3(.0, 2.0, -2.);
+                float3 ro = float3(.0, 4.0, -2.);
                 float3 lookat = float3(.0, 1., 5.);
 
                 float3x3 cameraMatrix = setCamera(ro, lookat, float3(0., 1., 0.));
@@ -308,21 +369,12 @@ Shader "Unlit/DefinitiveSDF"
                 float3 lightSourcePos = float3(sin(t/2)*5, 6., cos(t/2)*5);
                 
                 float4 res = rayMarch(ro, rd);
-                // res /= 20;
-                // res = step(1, res);
                 
                 float3 p = ro + rd * res.x;
 
                 float4 res_light = getLight(p, lightSourcePos);
                 float4 res_color = float4(res.yzw, 1);
-                // if (res.y != -1)
-                // {
-                //     int objId = int(res.y);
-                //     res_color = float4(_Colors[objId]);
-                // }
 
-                //return res_color;
-                //return res_color;
                 return res_light * res_color;
             }
             ENDCG
